@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>안양시 방문객 분석 (내국인 vs 외국인)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', dotum, sans-serif;
+            background-color: #f5f7fb;
+            margin: 0;
+            padding: 40px 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        h1 {
+            font-size: 24px;
+            text-align: center;
+            color: #1e293b;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #64748b;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .chart-box {
+            position: relative;
+            margin: auto;
+            height: 400px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>안양시 방문자 유형별 통계</h1>
+    <div class="subtitle">공공데이터포털 DataLabService 기반 분석 (로컬 데이터 모드)</div>
+    
+    <div class="chart-box" id="chartWrapper">
+        <canvas id="visitorChart"></canvas>
+    </div>
+</div>
+
+<script>
+    // 외부 JSON 파일을 불러오지 않고, 코드 내부에 데이터를 직접 주입하여 보안 에러를 방지합니다.
+    const data = [
+      { "visitor_type": "현지인방문자", "region": "안양시", "total_visitors": 3450210 },
+      { "visitor_type": "외지인방문자", "region": "안양시", "total_visitors": 2189400 },
+      { "visitor_type": "외국인방문자", "region": "안양시", "total_visitors": 45620 }
+    ];
+
+    // 1. 데이터에서 라벨과 수치 추출
+    const labels = data.map(item => item.visitor_type);
+    const visitors = data.map(item => item.total_visitors);
+
+    // 2. Chart.js 그래프 생성
+    const ctx = document.getElementById('visitorChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '방문자 수 (명)',
+                data: visitors,
+                backgroundColor: [
+                    'rgba(54, 162, 235, 0.6)',  // 현지인
+                    'rgba(75, 192, 192, 0.6)',  // 외지인
+                    'rgba(255, 99, 132, 0.6)'   // 외국인
+                ],
+                borderColor: [
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(255, 99, 132, 1)'
+                ],
+                borderWidth: 1,
+                barThickness: 50
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString('ko-KR') + ' 명';
+                        }
+                    }
+                }
+            }
+        }
+    });
+</script>
+
+</body>
+</html>

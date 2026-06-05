@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  data-collector:
+    build: ./collector
+    container_name: tourism-collector
+    environment:
+      - API_KEY=8930706ba13efeb548fc5f34144577b7391e867873bfc901d3e017331dec6a76
+    volumes:
+      - shared_data:/app/data
+    restart: always
+
+  web-server:
+    build: ./web
+    container_name: tourism-web
+    ports:
+      - "8080:80"
+    volumes:
+      - shared_data:/usr/share/nginx/html/data
+    depends_on:
+      - data-collector
+    restart: always
+
+volumes:
+  shared_data:

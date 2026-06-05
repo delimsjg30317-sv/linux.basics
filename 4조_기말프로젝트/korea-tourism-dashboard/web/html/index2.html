@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>지역별 방문객 데이터 분석</title>
+    <style>
+        :root {
+            --bg-color: #f4f6f9;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --primary-color: #3182ce;
+            --warning-color: #e53e3e;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        header {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+
+        header p {
+            color: #718096;
+            margin: 0;
+        }
+
+        /* 가장 방문객이 적은 곳 카드 (강조) */
+        .alert-card {
+            background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+            border: 1px solid #feb2b2;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .alert-info h2 {
+            margin: 0 0 8px 0;
+            font-size: 1.1rem;
+            color: var(--warning-color);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .alert-info .location {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #9b2c2c;
+        }
+
+        .alert-value {
+            text-align: right;
+        }
+
+        .alert-value .count {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--warning-color);
+        }
+
+        .alert-value .date {
+            font-size: 0.9rem;
+            color: #c53030;
+            margin-top: 5px;
+        }
+
+        /* 전체 데이터 테이블 */
+        .data-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        .data-card h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #4a5568;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: #f7fafc;
+            color: #4a5568;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background-color: #f8fafc;
+        }
+
+        .badge {
+            background-color: #edf2f7;
+            color: #4a5568;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>관광 데이터 분석 대시보드</h1>
+        <p>공공데이터포털 DataLabService 실시간 연동</p>
+    </header>
+
+    <div class="alert-card">
+        <div class="alert-info">
+            <h2>⚠️ 실시간 최소 방문 지역</h2>
+            <div class="location" id="min-location">데이터를 불러오는 중...</div>
+        </div>
+        <div class="alert-value">
+            <div class="count" id="min-count">0 명</div>
+            <div class="date" id="min-date">조회 기준일: -</div>
+        </div>
+    </div>
+
+    <div class="data-card">
+        <h3>전체 수집 데이터 현황</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>기준 일자</th>
+                    <th>광역시도</th>
+                    <th>시군구</th>
+                    <th>방문객 수 (명)</th>
+                </tr>
+            </thead>
+            <tbody id="data-table-body">
+                <tr>
+                    <td colspan="4" style="text-align: center; color: #a0aec0;">데이터를 로딩 중입니다...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // 1. 날짜 포맷 함수 (YYYYMMDD -> YYYY-MM-DD)
+    function formatDate(str) {
+        if(!str || str.length !== 8) return str;
+        return `${str.substring(0,4)}-${str.substring(4,6)}-${str.substring(6,8)}`;
+    }
+
+    // 2. 파일들로부터 데이터를 읽어와 화면에 뿌려주는 로직
+    async function loadDashboardData() {
+        try {
+            // fetch.sh가 보관하는 /app/data/ 경로의 파일들을 fetch (웹서버 상대경로 기준)
+            const minRes = await fetch('./min_visitor.json');
+            const minData = await minRes.json();
+
+            const summaryRes = await fetch('./summary.json');
+            const summaryData = await summaryRes.json();
+
+            // [상단 카드] 최소 방문객 지역 매핑
+            if(minData) {
+                document.getElementById('min-location').innerText = `${minData.ctlRegnNm} ${minData.signguNm}`;
+                document.getElementById('min-count').innerText = `${Number(minData.signguVisitrCo).toLocaleString()} 명`;
+                document.getElementById('min-date').innerText = `조회 기준일: ${formatDate(minData.baseYmd)}`;
+            }
+
+            // [하단 테이블] 전체 리스트 매핑 (상위 10개 행만 예시 출력)
+            const tbody = document.getElementById('data-table-body');
+            tbody.innerHTML = ''; // 초기화
+
+            if(summaryData && summaryData.length > 0) {
+                summaryData.slice(0, 50).forEach(item => { // 데이터가 너무 많을 수 있으므로 상위 50개 예시 분할
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><span class="badge">${formatDate(item.baseYmd)}</span></td>
+                        <td>${item.ctlRegnNm}</td>
+                        <td>${item.signguNm}</td>
+                        <td><strong>${Number(item.signguVisitrCo).toLocaleString()}</strong></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align: center;">데이터가 존재하지 않습니다.</td></tr>`;
+            }
+
+        } catch (error) {
+            console.error("데이터 로드 실패 (로컬 테스트용 가상 데이터를 노출합니다):", error);
+            setupMockData(); // API 서버 없이 브라우저로 더블 클릭해 열었을 때 보여줄 가짜 데이터
+        }
+    }
+
+    // 파일 fetch 실패 시(Nginx가 아닌 브라우저 파일 단독 실행 시) 보여줄 UI 데모용 mock 데이터
+    function setupMockData() {
+        document.getElementById('min-location').innerText = "경상북도 울릉군";
+        document.getElementById('min-count').innerText = "1,245 명";
+        document.getElementById('min-date').innerText = "조회 기준일: 2026-06-03";
+
+        const tbody = document.getElementById('data-table-body');
+        tbody.innerHTML = `
+            <tr><td><span class="badge">2026-06-03</span></td><td>서울특별시</td><td>종로구</td><td><strong>145,200</strong></td></tr>
+            <tr><td><span class="badge">2026-06-03</span></td><td>부산광역시</td><td>해운대구</td><td><strong>98,410</strong></td></tr>
+            <tr><td><span class="badge">2026-06-03</span></td><td>경상북도</td><td>울릉군</td><td><strong>1,245</strong></td></tr>
+        `;
+    }
+
+    // 페이지 로드 시 실행
+    window.onload = loadDashboardData;
+</script>
+</body>
+</html>

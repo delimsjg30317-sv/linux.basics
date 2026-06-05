@@ -1,0 +1,64 @@
+#!/bin/bash
+
+DATA_DIR="/app/data"
+mkdir -p "$DATA_DIR"
+
+BASE_URL="http://apis.data.go.kr/B551011/DataLabService"
+ENDPOINT="/locgoRegnVisitrDDList"
+
+TODAY=$(date +"%Y%m%d")
+YESTERDAY=$(date -d "yesterday" +"%Y%m%d")
+
+if [ ! -f "$DATA_DIR/20230101.json" ]; then
+    echo "초기 데이터 적재를 시작합니다 (2023-01-01 ~ $YESTERDAY)"
+    START_DATE="20230101"
+    END_DATE=$YESTERDAY
+else
+    echo "일일 데이터 수집을 시작합니다 ($YESTERDAY)"
+    START_DATE=$YESTERDAY
+    END_DATE=$YESTERDAY
+fi
+
+REQ_URL="${BASE_URL}${ENDPOINT}?serviceKey=${API_KEY}&numOfRows=65000&pageNo=1&MobileOS=ETC&MobileApp=AppTest&_type=json&startYmd=${START_DATE}&endYmd=${END_DATE}"
+
+echo "Fetching data from: $REQ_URL"
+
+curl -s -X GET "$REQ_URL" | jq '.' > "$DATA_DIR/latest_raw.json"
+
+# 응답 헤더가 정상(0000)인 경우 body의 items만 추출
+jq '.response.body.items.item // []' "$DATA_DIR/latest_raw.json" > "$DATA_DIR/summary.json"
+
+
+# ====================================================================
+# [추가 항목] 가장 방문객이 적은 곳 추출 로직
+# ====================================================================
+SUMMARY_FILE="$DATA_DIR/summary.json"
+
+# 파일이 비어있지 않고 데이터가 존재하는지 확인
+if [ -s "$SUMMARY_FILE" ] && [ "$(jq 'length' "$SUMMARY_FILE")" -gt 0 ]; then
+    echo "가장 방문객이 적은 곳을 분석 중..."
+    
+    # 1. 방문객 수(signguVisitrCo)를 숫자로 변환한 뒤, 가장 작은 값을 가진 데이터 1개를 추출합니다.
+    # 2. 분석 결과는 min_visitor.json에 따로 저장합니다.
+    jq 'min_by(.signguVisitrCo | tonumber)' "$SUMMARY_FILE" > "$DATA_DIR/min_visitor.json"
+    
+    # 터미널에 가독성 좋게 출력하기 위한 변수 지정
+    MIN_DATE=$(jq -r '.baseYmd' "$DATA_DIR/min_visitor.json")
+    MIN_CITY=$(jq -r '.ctlRegnNm' "$DATA_DIR/min_visitor.json")     # 광역시도명
+    MIN_DISTRICT=$(jq -r '.signguNm' "$DATA_DIR/min_visitor.json")  # 시군구명
+    MIN_COUNT=$(jq -r '.signguVisitrCo' "$DATA_DIR/min_visitor.json") # 방문객 수
+
+    echo "--------------------------------------------------"
+    echo "★ 가장 방문객이 적은 곳 분석 결과 ★"
+    echo "기본 날짜: $MIN_DATE"
+    echo "지역: $MIN_CITY $MIN_DISTRICT"
+    echo "방문객 수: $MIN_COUNT 명"
+    echo "상세 데이터 저장 위치: $DATA_DIR/min_visitor.json"
+    echo "--------------------------------------------------"
+else
+    echo "분석할 데이터가 없거나 수집에 실패했습니다."
+fi
+# ====================================================================
+
+
+echo "데이터 수집 완료: $(date)"

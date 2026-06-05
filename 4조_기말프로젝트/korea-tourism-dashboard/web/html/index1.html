@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내/외국인 관광 방문객 분석</title>
+    <style>
+        :root {
+            --bg-color: #f7fafc;
+            --card-bg: #ffffff;
+            --text-main: #2d3748;
+            --text-sub: #718096;
+            --border: #e2e8f0;
+            
+            --max-color: #3182ce;
+            --max-bg: #ebf8ff;
+            --min-color: #e53e3e;
+            --min-bg: #fff5f5;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 2.2rem;
+            margin-bottom: 8px;
+        }
+
+        header p {
+            color: var(--text-sub);
+            margin: 0;
+        }
+
+        /* 4분할 그리드 레이아웃 */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 최다/최소 상단 뱃지 배경 효과 */
+        .card.max-type { border-top: 4px solid var(--max-color); }
+        .card.min-type { border-top: 4px solid var(--min-color); }
+
+        .card-tag {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+        .max-type .card-tag { color: var(--max-color); }
+        .min-type .card-tag { color: var(--min-color); }
+
+        .card-location {
+            font-size: 1.6rem;
+            font-weight: 800;
+            margin-bottom: 16px;
+            color: #1a202c;
+        }
+
+        .card-value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+        }
+        .max-type .card-value { color: #2b6cb0; }
+        .min-type .card-value { color: #c53030; }
+
+        .card-value span {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-sub);
+        }
+
+        .card-date {
+            font-size: 0.85rem;
+            color: var(--text-sub);
+            margin-top: 12px;
+            border-top: 1px dashed var(--border);
+            padding-top: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>관광객 유형별 극값(Extremes) 분석</h1>
+        <p>내국인 및 외국인 데이터 기반 실시간 최고·최저 방문 지역</p>
+    </header>
+
+    <div class="grid-container">
+        <div class="card max-type">
+            <div>
+                <div class="card-tag">✈️ 외국인 방문객 최다 지역</div>
+                <div class="card-location" id="f-max-loc">로딩 중...</div>
+            </div>
+            <div>
+                <div class="card-value" id="f-max-val">0 <span>명</span></div>
+                <div class="card-date" id="f-max-date">기준일: -</div>
+            </div>
+        </div>
+
+        <div class="card min-type">
+            <div>
+                <div class="card-tag">✈️ 외국인 방문객 최소 지역</div>
+                <div class="card-location" id="f-min-loc">로딩 중...</div>
+            </div>
+            <div>
+                <div class="card-value" id="f-min-val">0 <span>명</span></div>
+                <div class="card-date" id="f-min-date">기준일: -</div>
+            </div>
+        </div>
+
+        <div class="card max-type">
+            <div>
+                <div class="card-tag">🏠 내국인 방문객 최다 지역</div>
+                <div class="card-location" id="d-max-loc">로딩 중...</div>
+            </div>
+            <div>
+                <div class="card-value" id="d-max-val">0 <span>명</span></div>
+                <div class="card-date" id="d-max-date">기준일: -</div>
+            </div>
+        </div>
+
+        <div class="card min-type">
+            <div>
+                <div class="card-tag">🏠 내국인 방문객 최소 지역</div>
+                <div class="card-location" id="d-min-loc">로딩 중...</div>
+            </div>
+            <div>
+                <div class="card-value" id="d-min-val">0 <span>명</span></div>
+                <div class="card-date" id="d-min-date">기준일: -</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function formatDate(str) {
+        if(!str || str.length !== 8) return str;
+        return `${str.substring(0,4)}-${str.substring(4,6)}-${str.substring(6,8)}`;
+    }
+
+    async function fetchCard(url, locId, valId, dateId, fieldName) {
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            
+            if(data) {
+                document.getElementById(locId).innerText = `${data.ctlRegnNm} ${data.signguNm}`;
+                document.getElementById(valId).innerHTML = `${Number(data[fieldName]).toLocaleString()} <span>명</span>`;
+                document.getElementById(dateId).innerText = `기준일: ${formatDate(data.baseYmd)}`;
+            }
+        } catch(e) {
+            document.getElementById(locId).innerText = "데이터 없음";
+            console.error(url + " 로드 실패", e);
+        }
+    }
+
+    async function initDashboard() {
+        // 각각 가공된 json 파일 매핑 (상대경로 기준)
+        await fetchCard('./foreigner_max.json', 'f-max-loc', 'f-max-val', 'f-max-date', 'fvVisitrCo');
+        await fetchCard('./foreigner_min.json', 'f-min-loc', 'f-min-val', 'f-min-date', 'fvVisitrCo');
+        await fetchCard('./domestic_max.json', 'd-max-loc', 'd-max-val', 'd-max-date', 'ntnadmVisitrCo');
+        await fetchCard('./domestic_min.json', 'd-min-loc', 'd-min-val', 'd-min-date', 'ntnadmVisitrCo');
+    }
+
+    window.onload = initDashboard;
+</script>
+</body>
+</html>

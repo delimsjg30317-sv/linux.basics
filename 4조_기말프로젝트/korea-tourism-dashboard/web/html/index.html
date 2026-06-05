@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관광 빅데이터 인사이트</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Pretendard', sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        h1 { text-align: center; color: #2c3e50; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: #e8f4f8; padding: 20px; border-radius: 8px; text-align: center; }
+        .stat-card h3 { margin: 0 0 10px 0; color: #3498db; }
+        .stat-card p { font-size: 24px; font-weight: bold; margin: 0; }
+        canvas { max-width: 1000px; margin: 0 auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 지자체별 방문자 떡상 지표</h1>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>주목할 지역: 안양시</h3>
+                <p id="anyang-count">로딩 중...</p>
+            </div>
+            <div class="stat-card">
+                <h3>가장 방문객이 많은 곳</h3>
+                <p id="top-region">로딩 중...</p>
+            </div>
+        </div>
+
+        <canvas id="tourChart"></canvas>
+    </div>
+
+    <script>
+        async function loadData() {
+            try {
+                // 수집 컨테이너에서 만든 summary.json 호출
+                const response = await fetch('/data/summary.json');
+                const data = await response.json();
+
+                if (!data || data.length === 0) {
+                    document.getElementById('anyang-count').innerText = "데이터 없음";
+                    return;
+                }
+
+                // 기초 지자체별 방문자 수 합산 집계 로직
+                const regionMap = {};
+                data.forEach(item => {
+                    const regionName = item.signguNm;
+                    const visitors = Number(item.touNum);
+                    if (regionMap[regionName]) {
+                        regionMap[regionName] += visitors;
+                    } else {
+                        regionMap[regionName] = visitors;
+                    }
+                });
+
+                // 안양시 데이터 추출 (데이터셋에 따라 이름이 다를 수 있으므로 포함 여부로 체크)
+                const anyangKey = Object.keys(regionMap).find(k => k.includes('안양'));
+                document.getElementById('anyang-count').innerText = anyangKey ? regionMap[anyangKey].toLocaleString() + " 명" : "데이터 없음";
+
+                // 정렬 후 Top 10 추출
+                const sortedRegions = Object.entries(regionMap).sort((a, b) => b[1] - a[1]);
+                document.getElementById('top-region').innerText = `${sortedRegions[0][0]} (${sortedRegions[0][1].toLocaleString()} 명)`;
+
+                const top10 = sortedRegions.slice(0, 10);
+                const labels = top10.map(item => item[0]);
+                const values = top10.map(item => item[1]);
+
+                // Chart.js 렌더링
+                const ctx = document.getElementById('tourChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '방문자 수 (명)',
+                            data: values,
+                            backgroundColor: 'rgba(52, 152, 219, 0.6)',
+                            borderColor: 'rgba(52, 152, 219, 1)',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            } catch (error) {
+                console.error('데이터 로드 실패:', error);
+            }
+        }
+
+        loadData();
+    </script>
+</body>
+</html>

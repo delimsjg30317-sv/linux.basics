@@ -1,0 +1,17 @@
+[
+  {
+    "visitor_type": "현지인방문자",
+    "region": "안양시",
+    "total_visitors": 3450210
+  },
+  {
+    "visitor_type": "외지인방문자",
+    "region": "안양시",
+    "total_visitors": 2189400
+  },
+  {
+    "visitor_type": "외국인방문자",
+    "region": "안양시",
+    "total_visitors": 45620
+  }
+]

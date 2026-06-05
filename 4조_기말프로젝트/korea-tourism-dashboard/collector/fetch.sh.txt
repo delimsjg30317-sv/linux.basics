@@ -1,0 +1,67 @@
+#!/bin/bash
+
+DATA_DIR="/app/data"
+mkdir -p "$DATA_DIR"
+
+BASE_URL="http://apis.data.go.kr/B551011/DataLabService"
+ENDPOINT="/locgoRegnVisitrDDList"
+
+TODAY=$(date +"%Y%m%d")
+YESTERDAY=$(date -d "yesterday" +"%Y%m%d")
+
+if [ ! -f "$DATA_DIR/20230101.json" ]; then
+    echo "초기 데이터 적재를 시작합니다 (2023-01-01 ~ $YESTERDAY)"
+    START_DATE="20230101"
+    END_DATE=$YESTERDAY
+else
+    echo "일일 데이터 수집을 시작합니다 ($YESTERDAY)"
+    START_DATE=$YESTERDAY
+    END_DATE=$YESTERDAY
+fi
+
+REQ_URL="${BASE_URL}${ENDPOINT}?serviceKey=${API_KEY}&numOfRows=65000&pageNo=1&MobileOS=ETC&MobileApp=AppTest&_type=json&startYmd=${START_DATE}&endYmd=${END_DATE}"
+
+echo "Fetching data from: $REQ_URL"
+
+curl -s -X GET "$REQ_URL" | jq '.' > "$DATA_DIR/latest_raw.json"
+
+# 응답 헤더가 정상(0000)인 경우 body의 items만 추출
+jq '.response.body.items.item // []' "$DATA_DIR/latest_raw.json" > "$DATA_DIR/summary.json"
+
+
+# ====================================================================
+# [추가 항목] 내국인 / 외국인 방문객 최다 및 최소 지역 추출
+# ====================================================================
+SUMMARY_FILE="$DATA_DIR/summary.json"
+
+if [ -s "$SUMMARY_FILE" ] && [ "$(jq 'length' "$SUMMARY_FILE")" -gt 0 ]; then
+    echo "내국인 및 외국인 방문객 데이터 교차 분석 중..."
+
+    # 1. 외국인 방문객 (fvVisitrCo) 분석
+    # 최다 (Max): fvVisitrCo 기준 가장 큰 값 추출
+    jq 'max_by(.fvVisitrCo | tonumber)' "$SUMMARY_FILE" > "$DATA_DIR/foreigner_max.json"
+    # 최소 (Min): 데이터가 존재하고 0명 이상인 곳 중 가장 작은 값 추출
+    jq '[.[] | select((.fvVisitrCo | tonumber) >= 0)] | min_by(.fvVisitrCo | tonumber)' "$SUMMARY_FILE" > "$DATA_DIR/foreigner_min.json"
+
+    # 2. 내국인 방문객 (ntnadmVisitrCo) 분석
+    # 최다 (Max): ntnadmVisitrCo 기준 가장 큰 값 추출
+    jq 'max_by(.ntnadmVisitrCo | tonumber)' "$SUMMARY_FILE" > "$DATA_DIR/domestic_max.json"
+    # 최소 (Min): 데이터가 존재하고 0명 이상인 곳 중 가장 작은 값 추출
+    jq '[.[] | select((.ntnadmVisitrCo | tonumber) >= 0)] | min_by(.ntnadmVisitrCo | tonumber)' "$SUMMARY_FILE" > "$DATA_DIR/domestic_min.json"
+
+    # 터미널 확인용 요약 출력
+    echo "--------------------------------------------------------"
+    echo "📊 내/외국인 방문객 분석 완료 요약"
+    echo "--------------------------------------------------------"
+    echo "✈️ 외국인 최다: $(jq -r '.ctlRegnNm + " " + .signguNm' $DATA_DIR/foreigner_max.json) ($(jq -r '.fvVisitrCo' $DATA_DIR/foreigner_max.json)명)"
+    echo "✈️ 외국인 최소: $(jq -r '.ctlRegnNm + " " + .signguNm' $DATA_DIR/foreigner_min.json) ($(jq -r '.fvVisitrCo' $DATA_DIR/foreigner_min.json)명)"
+    echo "🏠 내국인 최다: $(jq -r '.ctlRegnNm + " " + .signguNm' $DATA_DIR/domestic_max.json) ($(jq -r '.ntnadmVisitrCo' $DATA_DIR/domestic_max.json)명)"
+    echo "🏠 내국인 최소: $(jq -r '.ctlRegnNm + " " + .signguNm' $DATA_DIR/domestic_min.json) ($(jq -r '.ntnadmVisitrCo' $DATA_DIR/domestic_min.json)명)"
+    echo "--------------------------------------------------------"
+else
+    echo "분석할 요약 데이터 파일이 비어있습니다."
+fi
+# ====================================================================
+
+
+echo "데이터 수집 완료: $(date)"
